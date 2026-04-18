@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Show, SignInButton, SignUpButton } from "@clerk/nextjs";
 
 const tiles = [
   {
@@ -45,9 +46,19 @@ export default function Home() {
             curated list of the only jobs and checks that actually matter.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/roast" className="btn">Start the roast</Link>
-            <Link href="/jobs" className="btn btn-ghost">Browse jobs</Link>
-            <Link href="/funding" className="btn btn-ghost">Browse funding</Link>
+            <Show when="signed-out">
+              <SignUpButton mode="modal">
+                <button className="btn">Sign up to get roasted</button>
+              </SignUpButton>
+              <SignInButton mode="modal">
+                <button className="btn btn-ghost">Sign in</button>
+              </SignInButton>
+            </Show>
+            <Show when="signed-in">
+              <Link href="/roast" className="btn">Start the roast</Link>
+              <Link href="/jobs" className="btn btn-ghost">Browse jobs</Link>
+              <Link href="/funding" className="btn btn-ghost">Browse funding</Link>
+            </Show>
           </div>
         </div>
       </section>
