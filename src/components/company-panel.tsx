@@ -7,17 +7,20 @@ import { truncate } from "@/lib/utils";
 import { LogoBadge } from "@/components/logo-badge";
 import { SideSheet } from "@/components/side-sheet";
 import type { OutreachSeed } from "@/components/outreach-modal";
+import type { PitchDeckSeed } from "@/components/pitch-deck-modal";
 
 export function CompanyPanel({
   company,
   role,
   onClose,
   onOpenOutreach,
+  onOpenPitch,
 }: {
   company: Company | null;
   role: string;
   onClose: () => void;
   onOpenOutreach: (seed: OutreachSeed) => void;
+  onOpenPitch: (seed: PitchDeckSeed) => void;
 }) {
   const [jobs, setJobs] = useState<ExaResult[] | null>(null);
   const [contacts, setContacts] = useState<ExaResult[] | null>(null);
@@ -122,19 +125,38 @@ export function CompanyPanel({
                             <div className="mt-1 text-xs text-[var(--color-muted-foreground)]">{truncate(r.text, 180)}</div>
                           )}
                         </div>
-                        <button
-                          className="btn btn-ghost shrink-0 text-xs"
-                          onClick={() =>
-                            onOpenOutreach({
-                              companyName: company.name,
-                              companyWebsite: company.website,
-                              job: r,
-                              role,
-                            })
-                          }
-                        >
-                          email
-                        </button>
+                        <div className="flex shrink-0 gap-1">
+                          <button
+                            className="btn btn-ghost text-xs"
+                            onClick={() =>
+                              onOpenPitch({
+                                companyName: company.name,
+                                companyWebsite: company.website,
+                                companyBlurb: company.blurb,
+                                companyCategory: company.category,
+                                companyTags: company.tags,
+                                job: r,
+                                role,
+                              })
+                            }
+                            title="Generate a pitch deck tailored to this role"
+                          >
+                            deck
+                          </button>
+                          <button
+                            className="btn btn-ghost text-xs"
+                            onClick={() =>
+                              onOpenOutreach({
+                                companyName: company.name,
+                                companyWebsite: company.website,
+                                job: r,
+                                role,
+                              })
+                            }
+                          >
+                            email
+                          </button>
+                        </div>
                       </div>
                     </li>
                   ))}
@@ -192,6 +214,22 @@ export function CompanyPanel({
             <a href={company.careers} target="_blank" rel="noreferrer" className="btn btn-ghost text-sm">
               Careers ↗
             </a>
+            <button
+              onClick={() =>
+                onOpenPitch({
+                  companyName: company.name,
+                  companyWebsite: company.website,
+                  companyBlurb: company.blurb,
+                  companyCategory: company.category,
+                  companyTags: company.tags,
+                  job: jobs?.[0],
+                  role,
+                })
+              }
+              className="btn btn-ghost text-sm"
+            >
+              Pitch deck
+            </button>
             <button
               onClick={() =>
                 onOpenOutreach({

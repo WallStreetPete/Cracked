@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { LogoBadge } from "@/components/logo-badge";
 import { CompanyPanel } from "@/components/company-panel";
 import { OutreachModal, type OutreachSeed } from "@/components/outreach-modal";
+import { PitchDeckModal, type PitchDeckSeed } from "@/components/pitch-deck-modal";
 
 type Props = {
   companies: Company[];
@@ -22,6 +23,7 @@ export default function JobsClient({ companies, categories }: Props) {
   const [role, setRole] = useState<string>("engineer");
   const [panelCompany, setPanelCompany] = useState<Company | null>(null);
   const [modalSeed, setModalSeed] = useState<OutreachSeed | null>(null);
+  const [pitchSeed, setPitchSeed] = useState<PitchDeckSeed | null>(null);
 
   useEffect(() => {
     setTags((params.get("tags") ?? "").split(",").filter(Boolean));
@@ -113,8 +115,10 @@ export default function JobsClient({ companies, categories }: Props) {
         role={role}
         onClose={() => setPanelCompany(null)}
         onOpenOutreach={(seed) => setModalSeed(seed)}
+        onOpenPitch={(seed) => setPitchSeed(seed)}
       />
       <OutreachModal open={modalSeed !== null} onClose={() => setModalSeed(null)} seed={modalSeed} />
+      <PitchDeckModal open={pitchSeed !== null} onClose={() => setPitchSeed(null)} seed={pitchSeed} />
     </div>
   );
 }

@@ -36,6 +36,9 @@ export default function RoastClient() {
       setResult(data);
       try {
         localStorage.setItem("cracked:lastRoast", JSON.stringify(data));
+        if (linkedin) localStorage.setItem("cracked:linkedin", linkedin);
+        if (pasted) localStorage.setItem("cracked:resumeText", pasted);
+        if (context) localStorage.setItem("cracked:personTagline", context.slice(0, 140));
       } catch {}
       toast.success(`Score: ${data.crackedScore}/100`);
     } catch (err) {
