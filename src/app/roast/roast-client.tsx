@@ -4,6 +4,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import type { RoastResult } from "@/lib/roast-schema";
 import { scoreBand } from "@/lib/utils";
+import { roastToMarkdown, buildPrintableHtml } from "@/lib/roast-markdown";
 
 export default function RoastClient() {
   const [file, setFile] = useState<File | null>(null);
@@ -244,43 +245,43 @@ function Skeleton() {
 function Result({ result }: { result: RoastResult }) {
   const band = scoreBand(result.crackedScore);
   const [memeBlob, setMemeBlob] = useState<Blob | null>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
 
-  async function downloadPdf() {
-    setPdfLoading(true);
-    try {
-      let memeBase64: string | undefined;
-      if (memeBlob) {
-        const arr = await memeBlob.arrayBuffer();
-        const bytes = new Uint8Array(arr);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        memeBase64 = btoa(binary);
-      }
-      const res = await fetch("/api/roast/pdf", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ result, memeBase64 }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `cracked-roast-${result.crackedScore}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      toast.success("PDF downloaded. Share at your own risk.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "PDF gen failed");
-    } finally {
-      setPdfLoading(false);
+  async function memeDataUrl(): Promise<string | undefined> {
+    if (!memeBlob) return undefined;
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : undefined);
+      reader.onerror = () => resolve(undefined);
+      reader.readAsDataURL(memeBlob);
+    });
+  }
+
+  function downloadMarkdown() {
+    const md = roastToMarkdown(result);
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cracked-roast-${result.crackedScore}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast.success("Markdown downloaded.");
+  }
+
+  async function openPrintView() {
+    const md = roastToMarkdown(result);
+    const meme = await memeDataUrl();
+    const html = buildPrintableHtml(md, { title: `Cracked roast · ${result.crackedScore}/100`, memeDataUrl: meme });
+    const win = window.open("", "_blank", "width=820,height=1000");
+    if (!win) {
+      toast.error("Allow popups to export as PDF, or use download markdown.");
+      return;
     }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
   }
 
   return (
@@ -289,9 +290,14 @@ function Result({ result }: { result: RoastResult }) {
         <div className="text-xs uppercase tracking-widest text-[var(--color-muted-foreground)]">
           your demolition
         </div>
-        <button onClick={downloadPdf} disabled={pdfLoading} className="btn btn-sm">
-          {pdfLoading ? "building PDF…" : "📄 download PDF"}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={downloadMarkdown} className="btn btn-ghost btn-sm">
+            ⬇ markdown
+          </button>
+          <button onClick={openPrintView} className="btn btn-sm">
+            📄 save as PDF
+          </button>
+        </div>
       </div>
       <MediaRoast result={result} onMemeReady={setMemeBlob} />
       <div className="card">
