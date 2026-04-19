@@ -66,12 +66,12 @@ export async function POST(req: NextRequest) {
       .join("\n\n");
 
     const { object } = await generateObject({
-      model: anthropic("claude-opus-4-7"),
+      model: anthropic("claude-sonnet-4-6"),
       schema: RoastSchema,
       system: SYSTEM,
-      prompt: `cook this person alive. be brutal, be funny, be specific, quote their actual lines. remember: zero em dashes. zero en dashes. gen z slang required.\n\n${userBlock}\n\nreturn ONLY the structured JSON matching the schema.`,
-      temperature: 0.85,
-      maxRetries: 1,
+      prompt: `cook this person alive. be brutal, be funny, be specific, quote their actual lines. remember: zero em dashes. zero en dashes. gen z slang required.\n\n${userBlock}\n\nreturn ONLY the structured JSON matching the schema. include at least 5 lineByLine entries and at least 2 redFlags.`,
+      temperature: 0.75,
+      maxRetries: 2,
     });
 
     return NextResponse.json(object);
