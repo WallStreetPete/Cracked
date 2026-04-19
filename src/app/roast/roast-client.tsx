@@ -116,17 +116,42 @@ function MediaRoast({ result }: { result: RoastResult }) {
   const [memeUrl, setMemeUrl] = useState<string | null>(null);
   const [memeErr, setMemeErr] = useState<string | null>(null);
   const [memeLoading, setMemeLoading] = useState(false);
-  const [clipUrl, setClipUrl] = useState<string | null>(null);
-  const [clipLoading, setClipLoading] = useState(false);
-  const [clipErr, setClipErr] = useState<string | null>(null);
+
+  async function gen() {
+    setMemeErr(null);
+    setMemeLoading(true);
+    try {
+      const res = await fetch("/api/roast/meme", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          verdict: result.verdict,
+          oneLinerMeme: result.oneLinerMeme,
+          crackedScore: result.crackedScore,
+          category: result.category,
+          redFlags: result.redFlags.slice(0, 3),
+          topLine: result.lineByLine[0]?.quote,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setMemeUrl(url);
+    } catch (err) {
+      setMemeErr(err instanceof Error ? err.message : "Meme gen failed");
+    } finally {
+      setMemeLoading(false);
+    }
+  }
 
   useEffect(() => {
     setMemeUrl(null);
     setMemeErr(null);
-    setClipUrl(null);
-    setClipErr(null);
     let cancelled = false;
-    async function run() {
+    (async () => {
       setMemeLoading(true);
       try {
         const res = await fetch("/api/roast/meme", {
@@ -137,6 +162,8 @@ function MediaRoast({ result }: { result: RoastResult }) {
             oneLinerMeme: result.oneLinerMeme,
             crackedScore: result.crackedScore,
             category: result.category,
+            redFlags: result.redFlags.slice(0, 3),
+            topLine: result.lineByLine[0]?.quote,
           }),
         });
         if (!res.ok) {
@@ -145,103 +172,47 @@ function MediaRoast({ result }: { result: RoastResult }) {
         }
         const blob = await res.blob();
         if (cancelled) return;
-        const url = URL.createObjectURL(blob);
-        setMemeUrl(url);
+        setMemeUrl(URL.createObjectURL(blob));
       } catch (err) {
         if (!cancelled) setMemeErr(err instanceof Error ? err.message : "Meme gen failed");
       } finally {
         if (!cancelled) setMemeLoading(false);
       }
-    }
-    run();
+    })();
     return () => {
       cancelled = true;
     };
-  }, [result.verdict, result.oneLinerMeme, result.crackedScore, result.category]);
-
-  async function genClip() {
-    setClipErr(null);
-    setClipLoading(true);
-    toast.message("Cooking a video clip (2-3 minutes)…");
-    try {
-      const res = await fetch("/api/roast/clip", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          verdict: result.verdict,
-          oneLinerMeme: result.oneLinerMeme,
-          crackedScore: result.crackedScore,
-          category: result.category,
-        }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as { videoUrl: string };
-      setClipUrl(data.videoUrl);
-      toast.success("Clip ready.");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Clip gen failed";
-      setClipErr(msg);
-      toast.error(msg);
-    } finally {
-      setClipLoading(false);
-    }
-  }
+  }, [result.verdict, result.oneLinerMeme, result.crackedScore, result.category, result.redFlags, result.lineByLine]);
 
   return (
     <div className="card space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="tag">ai-generated roast media</div>
+        <div className="tag">roast meme · nano banana</div>
         <div className="flex gap-2">
           {memeUrl && (
-            <a href={memeUrl} download="cracked-meme.png" className="btn btn-ghost btn-sm">
-              download meme
-            </a>
-          )}
-          {clipUrl && (
-            <a href={clipUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
-              open clip ↗
-            </a>
+            <>
+              <button onClick={gen} className="btn btn-ghost btn-sm" disabled={memeLoading}>
+                regenerate
+              </button>
+              <a href={memeUrl} download="cracked-meme.png" className="btn btn-ghost btn-sm">
+                download
+              </a>
+            </>
           )}
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="space-y-1">
-          <div className="text-xs uppercase tracking-widest text-[var(--color-muted-foreground)]">meme · gemini</div>
-          {memeLoading && <div className="h-64 animate-pulse rounded-xl bg-[var(--color-muted)]" />}
-          {!memeLoading && memeUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={memeUrl} alt="roast meme" className="w-full rounded-xl border border-[var(--color-border)]" />
+      <div className="mx-auto w-full max-w-md">
+        {memeLoading && <div className="aspect-square w-full animate-pulse rounded-xl bg-[var(--color-muted)]" />}
+        {!memeLoading && memeUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={memeUrl} alt="roast meme" className="w-full rounded-xl border border-[var(--color-border)]" />
+        )}
+        {!memeLoading && !memeUrl && memeErr && (
+          <div className="rounded-xl border border-[var(--color-danger)]/40 p-3 text-xs text-[var(--color-danger)]">
+            {memeErr}
+            <button onClick={gen} className="btn btn-ghost btn-sm mt-2">retry</button>
+          </div>
           )}
-          {!memeLoading && !memeUrl && memeErr && (
-            <div className="rounded-xl border border-[var(--color-danger)]/40 p-3 text-xs text-[var(--color-danger)]">
-              {memeErr}
-            </div>
-          )}
-        </div>
-        <div className="space-y-2">
-          <div className="text-xs uppercase tracking-widest text-[var(--color-muted-foreground)]">video · fal ltx</div>
-          {!clipUrl && !clipLoading && (
-            <button onClick={genClip} className="btn w-full" disabled={clipLoading}>
-              generate 5s roast clip
-            </button>
-          )}
-          {clipLoading && (
-            <div className="flex h-64 animate-pulse items-center justify-center rounded-xl bg-[var(--color-muted)] text-xs text-[var(--color-muted-foreground)]">
-              cooking… 2-3 min
-            </div>
-          )}
-          {clipUrl && (
-            <video src={clipUrl} controls autoPlay loop className="w-full rounded-xl border border-[var(--color-border)]" />
-          )}
-          {clipErr && !clipLoading && (
-            <div className="rounded-xl border border-[var(--color-danger)]/40 p-3 text-xs text-[var(--color-danger)]">
-              {clipErr}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

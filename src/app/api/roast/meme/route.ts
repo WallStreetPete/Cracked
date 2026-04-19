@@ -9,12 +9,28 @@ type Body = {
   oneLinerMeme?: string;
   crackedScore?: number;
   category?: string;
-  topText?: string;
-  bottomText?: string;
+  redFlags?: string[];
+  topLine?: string;
 };
 
-function normalize(s: string, max = 60) {
-  return s.replace(/—/g, ",").replace(/–/g, ",").slice(0, max).toUpperCase();
+const MEME_TEMPLATES = [
+  "drake-meme",
+  "distracted-boyfriend",
+  "two-buttons-sweating",
+  "gigachad-vs-soyjak",
+  "virgin-vs-chad",
+  "this-is-fine-dog-in-burning-room",
+  "expanding-brain-four-panel",
+  "npc-wojak-grey-face",
+  "crying-cat-over-laptop",
+  "stonks-guy-meme",
+  "wojak-doomer-glasses",
+  "trad-climber-sweating-meme",
+];
+
+function clean(s: string | undefined, max = 80) {
+  if (!s) return "";
+  return s.replace(/—/g, ",").replace(/–/g, ",").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
 export async function POST(req: NextRequest) {
@@ -23,14 +39,38 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: "Missing Gemini API key" }, { status: 500 });
 
     const body = (await req.json()) as Body;
-    const oneLiner = (body.oneLinerMeme ?? body.verdict ?? "COOKED").trim();
-    const top = normalize(body.topText ?? `CRACKED SCORE: ${body.crackedScore ?? "?"}/100`, 60);
-    const bottom = normalize(body.bottomText ?? oneLiner, 90);
+    const verdict = clean(body.verdict, 180);
+    const oneLiner = clean(body.oneLinerMeme, 120);
+    const score = body.crackedScore ?? 50;
+    const category = (body.category ?? "professional").replace(/_/g, " ");
+    const flags = (body.redFlags ?? []).map((f) => clean(f, 140)).filter(Boolean).slice(0, 3);
+    const topLine = clean(body.topLine, 120);
+    const template = MEME_TEMPLATES[Math.floor(Math.random() * MEME_TEMPLATES.length)];
 
-    const prompt = `Create a viral roast meme image, square 1:1, classic meme format with bold white Impact-style caption text with black outline at the TOP and BOTTOM of the image. No em dashes, no en dashes.
-TOP TEXT (render exactly): "${top}"
-BOTTOM TEXT (render exactly): "${bottom}"
-Style: satirical cartoon, exaggerated facial expression, tech/finance/startup cultural references, visually readable at thumbnail size. The character should look visibly cooked, mogged, or caught in a moment of cringe. Bright saturated colors. Keep text legible and spelled exactly as given. Make it genuinely funny, not mean-spirited in a cruel way, roast-battle energy. Category hint: ${body.category ?? "professional"}.`;
+    const flagsBlock = flags.length ? `\nSPECIFIC ROAST DETAILS TO REFERENCE:\n- ${flags.join("\n- ")}` : "";
+    const topBlock = topLine ? `\nACTUAL LINE FROM THEIR RESUME: "${topLine}"` : "";
+
+    const prompt = `You are generating a VIRAL, DEVASTATINGLY FUNNY, shareable roast meme image in classic Internet meme format. Think "peak of r/ProgrammerHumor crossed with Twitter FinBro mockery crossed with a SNL cold open." Audience: chronically online gen-z and millennials in tech, finance, and startups.
+
+MEME TEMPLATE TO USE: "${template}". Interpret this template faithfully, execute the standard layout and visual gag, but adapt the captions to THIS person's specific roast.
+
+THEIR PROFILE:
+- Cracked score: ${score}/100
+- Category: ${category}
+- Verdict: ${verdict}
+- One-liner roast: "${oneLiner}"${topBlock}${flagsBlock}
+
+VISUAL REQUIREMENTS:
+- Square 1:1 composition, 1024x1024 feel.
+- Bold white Impact-style meme caption text with thick black outline. Text MUST be legible and spelled exactly.
+- Cartoon or digital-illustration style. Exaggerated, ridiculous facial expressions. Overacted body language. Think Bob's Burgers meets Cyanide and Happiness meets Wojak.
+- One clear visual punchline, one clear caption punchline. The two together should make a chronically-online person actually laugh out loud.
+- Reference real tech/finance/startup iconography when it fits: monitors showing Slack, Bloomberg terminals, github profiles with 0 contributions, a Jira board, a "Stanford" sweatshirt, an empty Calendly, a rocket labeled with a company name, a nametag with a bank logo, an open LinkedIn tab with 'Open to Work', a ChatGPT window mid-prompt.
+- NO em dashes. NO en dashes. NO smart quotes. No misspelled words. No gibberish text.
+
+TONE: savage, specific, satirical, shareable. The meme should feel like something an actual human made to personally attack this person in a group chat, not like a generic AI stock meme. Lean into the absurd. Be mean but witty. If there's a gpt-slop phrase in their resume, put it on the image verbatim. If they picked a mid job over a cracked one, make the visual contrast painful.
+
+Do not include any watermark, logo, or signature. Output the finished meme image only.`;
 
     const ai = new GoogleGenAI({ apiKey });
     const res = await ai.models.generateContent({
@@ -50,7 +90,7 @@ Style: satirical cartoon, exaggerated facial expression, tech/finance/startup cu
         });
       }
     }
-    return NextResponse.json({ error: "No image returned" }, { status: 502 });
+    return NextResponse.json({ error: "No image returned by Gemini" }, { status: 502 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[roast/meme]", err);
