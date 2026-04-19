@@ -112,7 +112,7 @@ export default function RoastClient() {
   );
 }
 
-function MediaRoast({ result }: { result: RoastResult }) {
+function MediaRoast({ result, onMemeReady }: { result: RoastResult; onMemeReady?: (blob: Blob) => void }) {
   const [memeUrl, setMemeUrl] = useState<string | null>(null);
   const [memeErr, setMemeErr] = useState<string | null>(null);
   const [memeLoading, setMemeLoading] = useState(false);
@@ -138,6 +138,7 @@ function MediaRoast({ result }: { result: RoastResult }) {
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
       const blob = await res.blob();
+      onMemeReady?.(blob);
       const url = URL.createObjectURL(blob);
       setMemeUrl(url);
     } catch (err) {
@@ -172,6 +173,7 @@ function MediaRoast({ result }: { result: RoastResult }) {
         }
         const blob = await res.blob();
         if (cancelled) return;
+        onMemeReady?.(blob);
         setMemeUrl(URL.createObjectURL(blob));
       } catch (err) {
         if (!cancelled) setMemeErr(err instanceof Error ? err.message : "Meme gen failed");
@@ -241,9 +243,57 @@ function Skeleton() {
 
 function Result({ result }: { result: RoastResult }) {
   const band = scoreBand(result.crackedScore);
+  const [memeBlob, setMemeBlob] = useState<Blob | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  async function downloadPdf() {
+    setPdfLoading(true);
+    try {
+      let memeBase64: string | undefined;
+      if (memeBlob) {
+        const arr = await memeBlob.arrayBuffer();
+        const bytes = new Uint8Array(arr);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        memeBase64 = btoa(binary);
+      }
+      const res = await fetch("/api/roast/pdf", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ result, memeBase64 }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cracked-roast-${result.crackedScore}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast.success("PDF downloaded. Share at your own risk.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "PDF gen failed");
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <MediaRoast result={result} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs uppercase tracking-widest text-[var(--color-muted-foreground)]">
+          your demolition
+        </div>
+        <button onClick={downloadPdf} disabled={pdfLoading} className="btn btn-sm">
+          {pdfLoading ? "building PDF…" : "📄 download PDF"}
+        </button>
+      </div>
+      <MediaRoast result={result} onMemeReady={setMemeBlob} />
       <div className="card">
         <div className="flex flex-wrap items-center gap-6">
           <div
